@@ -6,16 +6,26 @@ import 'dart:convert';
 
 class AuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+  late String platforms; // Declare a late variable for platforms
+
+  // Initialize the platforms variable
+  void initializePlatforms() {
+    platforms = "Supported platforms: Google, Kakao";
+    debugPrint(platforms); // Optional: Debugging to confirm initialization
+  }
 
   Future<void> signInWithGoogle() async {
     final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
     if (googleUser == null) return; // 로그인 취소 시 처리
 
-    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
 
     // Django REST API에 Google 액세스 토큰 전달
     final response = await http.post(
-      Uri.parse('https://port-0-unclebob-api-m9hwt2ohea8935ae.sel4.cloudtype.app/accounts/google/login/'),
+      Uri.parse(
+        'https://port-0-unclebob-api-m9hwt2ohea8935ae.sel4.cloudtype.app/accounts/google/login/',
+      ),
       body: {'access_token': googleAuth.accessToken},
     );
 
@@ -39,7 +49,9 @@ class AuthService {
 
     // Django REST API에 Kakao 액세스 토큰 전달
     final response = await http.post(
-      Uri.parse('https://port-0-unclebob-api-m9hwt2ohea8935ae.sel4.cloudtype.app/accounts/kakao/login/'),
+      Uri.parse(
+        'https://port-0-unclebob-api-m9hwt2ohea8935ae.sel4.cloudtype.app/accounts/kakao/login/',
+      ),
       body: {'access_token': token.accessToken},
     );
 
