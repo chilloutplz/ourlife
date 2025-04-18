@@ -13,8 +13,27 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+
+  final FocusNode _usernameFocus = FocusNode();
+
   bool _isLoading = false;
   String _error = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _usernameFocus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _usernameFocus.dispose();
+    super.dispose();
+  }
 
   Future<void> loginUser() async {
     final username = _usernameController.text.trim();
@@ -65,6 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
           children: [
             TextField(
               controller: _usernameController,
+              focusNode: _usernameFocus,
               decoration: const InputDecoration(labelText: '아이디'),
             ),
             const SizedBox(height: 16),

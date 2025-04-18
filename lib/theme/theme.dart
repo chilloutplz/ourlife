@@ -19,12 +19,14 @@ class AppTheme {
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: white,
-      labelStyle: TextStyle(color: Colors.black87),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+      isDense: true,
+      contentPadding: const EdgeInsets.only(bottom: 4),
+      fillColor: Colors.blue,    labelStyle: TextStyle(color: Colors.black87),
+      border: UnderlineInputBorder(
         borderSide: BorderSide(color: Colors.grey),
+      ),
+      focusedBorder: UnderlineInputBorder(
+        borderSide: BorderSide(color: Colors.black, width: 2),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
