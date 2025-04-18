@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'screen/login_screen.dart'; // 로그인 화면 파일을 임포트
+import 'package:ourlife/theme/theme.dart';
+import 'package:ourlife/router/app_router.dart';
 
-void main() {
+
+void main() async{
   runApp(MyApp());
 }
 
@@ -11,11 +13,11 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Social Login App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: LoginScreen(), // 로그인 화면으로 연결
+      title: 'Ourlife',
+      theme: AppTheme.lightTheme,
+      initialRoute: '/', // 로그인 화면으로 연결
+      onGenerateRoute: AppRouter.generateRoute,
     );
   }
 }
+
