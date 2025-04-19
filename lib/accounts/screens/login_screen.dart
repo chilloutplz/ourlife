@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import 'package:ourlife/constants/constants.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -49,26 +51,42 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = '';
     });
 
-    final url = Uri.parse('https://port-0-unclebob-api-m9hwt2ohea8935ae.sel4.cloudtype.app/accounts/token/');
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'username': username,
-        'password': password,
-      }),
-    );
+    final url = Uri.parse(ApiConstants.login);
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('access', data['access']);
-      await prefs.setString('refresh', data['refresh']);
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'username': username,
+          'password': password,
+        }),
+      );
 
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/home'); // 홈 화면으로 이동
-    } else {
-      setState(() => _error = '로그인에 실패했습니다. 정보를 확인해주세요.');
+      // debugPrint('응답 상태 코드: ${response.statusCode}');
+      // debugPrint('응답 바디: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        final access = data['access'] as String?;
+        final refresh = data['refresh'] as String?;
+
+        if (access != null && refresh != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('access', access);
+          await prefs.setString('refresh', refresh);
+
+          if (!mounted) return;
+          Navigator.pushReplacementNamed(context, '/home');
+        } else {
+          setState(() => _error = '로그인에 실패했습니다. 응답이 올바르지 않습니다.');
+        }
+      } else {
+        setState(() => _error = '로그인에 실패했습니다. 정보를 확인해주세요.');
+      }
+    } catch (e) {
+      setState(() => _error = '오류 발생: $e');
     }
 
     setState(() => _isLoading = false);
@@ -90,7 +108,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
-              decoration: InputDecoration(labelText: '비밀번호'),
+              decoration: const InputDecoration(labelText: '비밀번호'),
               obscureText: true,
             ),
             const SizedBox(height: 16),
@@ -99,15 +117,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 _error,
                 style: const TextStyle(color: Colors.red),
               ),
-            ElevatedButton(
-              onPressed: _isLoading ? null : loginUser,
-              child: _isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('로그인'),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : loginUser,
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('로그인'),
+              ),
             ),
             TextButton(
               onPressed: () {
-                Navigator.pushNamed(context, '/register'); // 회원가입 화면으로 이동
+                Navigator.pushNamed(context, '/register');
               },
               child: const Text('회원가입하기'),
             )

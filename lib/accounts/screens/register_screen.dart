@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import 'package:ourlife/constants/constants.dart';
+
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -54,9 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _error = '';
     });
 
-    final url = Uri.parse(
-      'https://port-0-unclebob-api-m9hwt2ohea8935ae.sel4.cloudtype.app/accounts/register/',
-    );
+    final url = Uri.parse(ApiConstants.register);
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
