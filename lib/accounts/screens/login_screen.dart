@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = '';
     });
 
-    final url = Uri.parse('https://port-0-unclebob-api-m9hwt2ohea8935ae.sel4.cloudtype.app/api/token/');
+    final url = Uri.parse('https://port-0-unclebob-api-m9hwt2ohea8935ae.sel4.cloudtype.app/accounts/token/');
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
