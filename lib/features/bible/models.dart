@@ -11,9 +11,9 @@ class Book {
   final String name;
   final String slug;
   final String testament;
-  Book({required this.name, required this.slug, required this.testament});
+  Book({required this.name, required this.slug, this.testament = ''});
   factory Book.fromJson(Map<String, dynamic> j) => Book(
-    name: j['name'], slug: j['slug'], testament: j['testament'],
+    name: j['name'], slug: j['slug'],
   );
 }
 

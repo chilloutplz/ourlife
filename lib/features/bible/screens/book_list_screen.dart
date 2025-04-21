@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models.dart';
-import '../bible_service.dart';
+import '../services/bible_service.dart';
 
 class BookListScreen extends StatefulWidget {
   final String version;

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../../constants/constants.dart';
-import 'models.dart';
+import '../../../constants/constants.dart';
+import '../models.dart';
 
 class BibleService {
   static Future<List<Version>> getVersions() async {

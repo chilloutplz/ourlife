@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models.dart';
-import '../bible_service.dart';
+import '../services/bible_service.dart';
 
 class VerseSearchScreen extends StatefulWidget {
   const VerseSearchScreen({super.key});

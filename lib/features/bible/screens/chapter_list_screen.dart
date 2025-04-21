@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../bible_service.dart';
+import '../services/bible_service.dart';
 
 class ChapterListScreen extends StatefulWidget {
   final String version, book;
