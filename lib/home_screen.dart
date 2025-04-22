@@ -1,9 +1,11 @@
+// home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'package:ourlife/constants/constants.dart';
 import 'package:ourlife/providers/theme_provider.dart';
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -33,8 +35,10 @@ class HomeScreen extends StatelessWidget {
           children: [
             TodayVerseCard(),
             const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 24,
+              runSpacing: 24,
               children: [
                 _HomeIconButton(
                   icon: Icons.menu_book,
@@ -47,9 +51,19 @@ class HomeScreen extends StatelessWidget {
                   onTap: () => Navigator.pushNamed(context, '/notes'),
                 ),
                 _HomeIconButton(
+                  icon: Icons.wb_sunny, // QT 아이콘
+                  label: 'QT',
+                  onTap: () => Navigator.pushNamed(context, '/qt'),
+                ),
+                _HomeIconButton(
                   icon: Icons.person,
                   label: '일대일',
                   onTap: () => Navigator.pushNamed(context, '/one2one'),
+                ),
+                _HomeIconButton(
+                  icon: Icons.group, // 순 아이콘
+                  label: '순',
+                  onTap: () => Navigator.pushNamed(context, '/cellgroup'),
                 ),
               ],
             ),
@@ -102,47 +116,47 @@ class _TodayVerseCardState extends State<TodayVerseCard> {
 
   @override
   Widget build(BuildContext context) {
-  final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: colorScheme.primaryContainer, // 테마에 맞는 배경색
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '오늘의 말씀',
-          style: TextStyle(
-            color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
-            fontSize: 14,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer, // 테마에 맞는 배경색
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '오늘의 말씀',
+            style: TextStyle(
+              color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+              fontSize: 14,
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          '"$text"',
-          style: TextStyle(
-            color: colorScheme.onPrimaryContainer,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            height: 1.4,
+          const SizedBox(height: 12),
+          Text(
+            '"$text"',
+            style: TextStyle(
+              color: colorScheme.onPrimaryContainer,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              height: 1.4,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '- $reference',
-          style: TextStyle(
-            color: colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
-            fontSize: 14,
+          const SizedBox(height: 8),
+          Text(
+            '- $reference',
+            style: TextStyle(
+              color: colorScheme.onPrimaryContainer.withValues(alpha: 0.7),
+              fontSize: 14,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 }
 
 // 홈 아이콘 버튼

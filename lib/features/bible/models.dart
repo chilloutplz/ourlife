@@ -13,7 +13,7 @@ class Book {
   final String testament;
   Book({required this.name, required this.slug, this.testament = ''});
   factory Book.fromJson(Map<String, dynamic> j) => Book(
-    name: j['name'], slug: j['slug'],
+    name: j['name'], slug: j['slug'], testament: j['testament'],
   );
 }
 
