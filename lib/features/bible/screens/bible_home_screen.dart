@@ -34,10 +34,21 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
   Future<void> _loadInitialData() async {
     final prefs = await SharedPreferences.getInstance();
     final savedVersions = prefs.getStringList('selected_versions') ?? ['우리말'];
-    final savedBook = prefs.getString('last_book_$testament') ?? '창';
-    final savedChapter = prefs.getInt('last_chapter_$testament') ?? 1;
-    _fontSize = prefs.getDouble('font_size') ?? 16.0;
+    final savedTestament = prefs.getString('last_testament_overall');
+    final savedBook =
+        prefs.getString('last_book_overall') ??
+        prefs.getString('last_book_$testament') ??
+        '창';
+    final savedChapter =
+        prefs.getInt('last_chapter_overall') ??
+        prefs.getInt('last_chapter_$testament') ??
+        1;
 
+    if (savedTestament != null) {
+      testament = savedTestament;
+    }
+
+    _fontSize = prefs.getDouble('font_size') ?? 16.0;
     final versions = await BibleService.getVersions();
     final books = await BibleService.getBooks(savedVersions.first);
     final chapters = await BibleService.getChapters(
@@ -49,11 +60,11 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
       (b) => b.slug == savedBook,
       orElse: () => books.first,
     );
-    debugPrint(
-      'initialBook: ${initialBook.name}, slug: ${initialBook.slug}, testament: ${initialBook.testament}',
-    );
-    testament = initialBook.testament;
-    debugPrint('testament 값: $testament');
+    // debugPrint(
+    //   'initialBook: ${initialBook.name}, slug: ${initialBook.slug}, testament: ${initialBook.testament}',
+    // );
+    // testament = initialBook.testament;
+    // debugPrint('testament 값: $testament');
 
     setState(() {
       allVersions = versions;
@@ -79,8 +90,14 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
     }
 
     final prefs = await SharedPreferences.getInstance();
+    // 신약, 구약 별 최종위치 - book 변경 시 읽어올 위치
     await prefs.setString('last_book_$testament', book);
     await prefs.setInt('last_chapter_$testament', chapter);
+
+    // 최종 읽던 곳의 위치 - 성경앱 실행시 읽어올 위치
+    await prefs.setString('last_book_overall', book);
+    await prefs.setInt('last_chapter_overall', chapter);
+    await prefs.setString('last_testament_overall', testament);
 
     setState(() {
       isLoading = false;
@@ -96,40 +113,85 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
     final selected = await showDialog<List<String>>(
       context: context,
       builder: (context) {
-        final temp = Set<String>.from(selectedVersions);
-        return AlertDialog(
-          title: const Text('성경 버전 선택'),
-          content: SingleChildScrollView(
-            child: Column(
-              children:
-                  allVersions.map((v) {
-                    final checked = temp.contains(v.name);
-                    return CheckboxListTile(
-                      title: Text(v.name),
-                      value: checked,
-                      onChanged: (bool? value) {
-                        setState(() {
-                          if (value == true) {
-                            temp.add(v.name);
-                          } else {
-                            temp.remove(v.name);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, null),
-              child: const Text('취소'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, temp.toList()),
-              child: const Text('확인'),
-            ),
-          ],
+        List<String> temp = List<String>.from(selectedVersions);
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('선택과 순서'),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 400,
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: ReorderableListView.builder(
+                        buildDefaultDragHandles: false,
+                        itemCount: allVersions.length,
+                        onReorder: (oldIndex, newIndex) {
+                          if (oldIndex < newIndex) newIndex -= 1;
+                          setState(() {
+                            final item = allVersions.removeAt(oldIndex);
+                            allVersions.insert(newIndex, item);
+                            // temp 순서도 업데이트
+                            temp =
+                                allVersions
+                                    .where((v) => temp.contains(v.name))
+                                    .map((v) => v.name)
+                                    .toList();
+                          });
+                        },
+                        itemBuilder: (context, index) {
+                          final v = allVersions[index];
+                          final checked = temp.contains(v.name);
+                          return ReorderableDragStartListener(
+                            key: ValueKey(v.name),
+                            index: index,
+                            child: ListTile(
+                              title: Row(
+                                children: [
+                                  Checkbox(
+                                    value: checked,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        if (val == true) {
+                                          if (!temp.contains(v.name)) {
+                                            temp.add(v.name);
+                                          }
+                                        } else {
+                                          temp.remove(v.name);
+                                        }
+                                      });
+                                    },
+                                  ),
+                                  Text(v.name),
+                                ],
+                              ),
+                              trailing: const Icon(Icons.drag_handle),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, null),
+                          child: const Text('취소'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, temp),
+                          child: const Text('확인'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -234,7 +296,7 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('말씀'),
+        title: const Text('본문'),
         actions: [
           IconButton(
             onPressed: _decreaseFontSize,
