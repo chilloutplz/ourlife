@@ -1,8 +1,8 @@
-// bible_home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ourlife/features/bible/services/bible_service.dart';
 import 'package:ourlife/features/bible/models.dart';
+
 
 class BibleHomeScreen extends StatefulWidget {
   const BibleHomeScreen({super.key});
@@ -12,9 +12,11 @@ class BibleHomeScreen extends StatefulWidget {
 }
 
 class _BibleHomeScreenState extends State<BibleHomeScreen> {
+  final ScrollController _scrollController = ScrollController();
   List<Version> allVersions = [];
   List<Book> allBooks = [];
   List<int> allChapters = [];
+  List<GlobalKey> _verseKeys = [];
 
   List<String> selectedVersions = [];
   String testament = 'OT';
@@ -24,25 +26,67 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
 
   Map<String, List<Verse>> versesByVersion = {};
   bool isLoading = true;
+  int? _verseToScroll;
+  double? _savedScrollOffset;
 
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
+    _scrollController.addListener(_onScroll);
+    _loadInitialData().then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      _savedScrollOffset = prefs.getDouble('last_scroll_offset');
+      _verseToScroll = prefs.getInt('last_verse');
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() async {
+    if (_scrollController.hasClients) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('last_scroll_offset', _scrollController.offset);
+      
+      final firstVisibleItem = _getFirstVisibleVerse();
+      if (firstVisibleItem != null) {
+        await prefs.setInt('last_verse', firstVisibleItem + 1);
+      }
+    }
+  }
+
+  int? _getFirstVisibleVerse() {
+    if (!_scrollController.hasClients || _verseKeys.isEmpty) return null;
+    
+    final scrollPosition = _scrollController.position;
+    final viewportHeight = scrollPosition.viewportDimension;
+    final scrollOffset = scrollPosition.pixels + viewportHeight * 0.1;
+    
+    for (int i = 0; i < _verseKeys.length; i++) {
+      final keyContext = _verseKeys[i].currentContext;
+      if (keyContext != null) {
+        final box = keyContext.findRenderObject() as RenderBox;
+        final position = box.localToGlobal(Offset.zero);
+        if (position.dy <= scrollOffset) {
+          return i;
+        }
+      }
+    }
+    return null;
   }
 
   Future<void> _loadInitialData() async {
     final prefs = await SharedPreferences.getInstance();
     final savedVersions = prefs.getStringList('selected_versions') ?? ['우리말'];
     final savedTestament = prefs.getString('last_testament_overall');
-    final savedBook =
-        prefs.getString('last_book_overall') ??
-        prefs.getString('last_book_$testament') ??
-        '창';
-    final savedChapter =
-        prefs.getInt('last_chapter_overall') ??
-        prefs.getInt('last_chapter_$testament') ??
-        1;
+    final savedBook = prefs.getString('last_book_overall') ?? 
+                     prefs.getString('last_book_$testament') ?? '창';
+    final savedChapter = prefs.getInt('last_chapter_overall') ?? 
+                        prefs.getInt('last_chapter_$testament') ?? 1;
 
     if (savedTestament != null) {
       testament = savedTestament;
@@ -60,11 +104,6 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
       (b) => b.slug == savedBook,
       orElse: () => books.first,
     );
-    // debugPrint(
-    //   'initialBook: ${initialBook.name}, slug: ${initialBook.slug}, testament: ${initialBook.testament}',
-    // );
-    // testament = initialBook.testament;
-    // debugPrint('testament 값: $testament');
 
     setState(() {
       allVersions = versions;
@@ -89,12 +128,12 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
       versesByVersion[v] = verses;
     }
 
+    final verseCount = versesByVersion[selectedVersions.first]?.length ?? 0;
+    _verseKeys = List.generate(verseCount, (_) => GlobalKey());
+
     final prefs = await SharedPreferences.getInstance();
-    // 신약, 구약 별 최종위치 - book 변경 시 읽어올 위치
     await prefs.setString('last_book_$testament', book);
     await prefs.setInt('last_chapter_$testament', chapter);
-
-    // 최종 읽던 곳의 위치 - 성경앱 실행시 읽어올 위치
     await prefs.setString('last_book_overall', book);
     await prefs.setInt('last_chapter_overall', chapter);
     await prefs.setString('last_testament_overall', testament);
@@ -102,6 +141,33 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
     setState(() {
       isLoading = false;
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreScrollPosition();
+    });
+  }
+
+  void _restoreScrollPosition() {
+    if (_verseToScroll != null && _verseToScroll! > 0) {
+      final indexToScroll = _verseToScroll! - 1;
+      if (indexToScroll < _verseKeys.length) {
+        final ctx = _verseKeys[indexToScroll].currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 300),
+            alignment: 0.1,
+          );
+          debugPrint('✅ 성공적으로 $_verseToScroll절로 스크롤');
+          return;
+        }
+      }
+    }
+
+    if (_savedScrollOffset != null && _scrollController.hasClients) {
+      _scrollController.jumpTo(_savedScrollOffset!);
+      debugPrint('⚠️ 절 스크롤 실패, 저장된 오프셋으로 복원: $_savedScrollOffset');
+    }
   }
 
   Future<void> _saveFontSize() async {
@@ -133,12 +199,10 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
                           setState(() {
                             final item = allVersions.removeAt(oldIndex);
                             allVersions.insert(newIndex, item);
-                            // temp 순서도 업데이트
-                            temp =
-                                allVersions
-                                    .where((v) => temp.contains(v.name))
-                                    .map((v) => v.name)
-                                    .toList();
+                            temp = allVersions
+                                .where((v) => temp.contains(v.name))
+                                .map((v) => v.name)
+                                .toList();
                           });
                         },
                         itemBuilder: (context, index) {
@@ -225,16 +289,17 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
   }
 
   Widget _buildVerseComparison() {
-    final verseCount =
-        versesByVersion.values.isNotEmpty
-            ? versesByVersion.values.first.length
-            : 0;
+    final verseCount = versesByVersion.values.isNotEmpty
+        ? versesByVersion.values.first.length
+        : 0;
 
     return ListView.builder(
+      controller: _scrollController,
       itemCount: verseCount,
       itemBuilder: (context, index) {
         return Card(
-          color: Colors.brown,
+          key: _verseKeys[index],
+          color: Colors.brown[900],
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           elevation: 1,
           shape: RoundedRectangleBorder(
@@ -257,8 +322,7 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
                 const SizedBox(height: 6),
                 ...selectedVersions.map((v) {
                   final verses = versesByVersion[v] ?? [];
-                  final text =
-                      (index < verses.length) ? verses[index].text : '[없음]';
+                  final text = (index < verses.length) ? verses[index].text : '[없음]';
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: RichText(
@@ -291,8 +355,7 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredBooks =
-        allBooks.where((b) => b.testament == testament).toList();
+    final filteredBooks = allBooks.where((b) => b.testament == testament).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -312,107 +375,100 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
           ),
         ],
       ),
-      body:
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      children: [
-                        DropdownButton<String>(
-                          value: testament,
-                          onChanged: (newTestament) async {
-                            if (newTestament == null) return;
-                            final prefs = await SharedPreferences.getInstance();
-                            final savedBook =
-                                prefs.getString('last_book_$newTestament') ??
-                                allBooks
-                                    .firstWhere(
-                                      (b) => b.testament == newTestament,
-                                    )
-                                    .slug;
-                            final savedChapter =
-                                prefs.getInt('last_chapter_$newTestament') ?? 1;
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      DropdownButton<String>(
+                        value: testament,
+                        onChanged: (newTestament) async {
+                          if (newTestament == null) return;
+                          final prefs = await SharedPreferences.getInstance();
+                          final savedBook = prefs.getString('last_book_$newTestament') ??
+                              allBooks.firstWhere(
+                                (b) => b.testament == newTestament,
+                              ).slug;
+                          final savedChapter = prefs.getInt('last_chapter_$newTestament') ?? 1;
 
+                          final chapters = await BibleService.getChapters(
+                            selectedVersions.first,
+                            savedBook,
+                          );
+
+                          setState(() {
+                            testament = newTestament;
+                            book = savedBook;
+                            chapter = savedChapter;
+                            allChapters = chapters;
+                          });
+
+                          await _loadVerses();
+                        },
+                        items: const [
+                          DropdownMenuItem(value: 'OT', child: Text('구약')),
+                          DropdownMenuItem(value: 'NT', child: Text('신약')),
+                        ],
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DropdownButton<String>(
+                          value: book,
+                          isExpanded: true,
+                          onChanged: (newBook) async {
+                            if (newBook == null) return;
                             final chapters = await BibleService.getChapters(
                               selectedVersions.first,
-                              savedBook,
+                              newBook,
                             );
-
                             setState(() {
-                              testament = newTestament;
-                              book = savedBook;
-                              chapter = savedChapter;
+                              book = newBook;
+                              chapter = 1;
                               allChapters = chapters;
                             });
-
                             await _loadVerses();
                           },
-                          items: const [
-                            DropdownMenuItem(value: 'OT', child: Text('구약')),
-                            DropdownMenuItem(value: 'NT', child: Text('신약')),
-                          ],
+                          items: filteredBooks.map((b) {
+                            return DropdownMenuItem<String>(
+                              value: b.slug,
+                              child: Text(
+                                b.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }).toList(),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: DropdownButton<String>(
-                            value: book,
-                            isExpanded: true,
-                            onChanged: (newBook) async {
-                              if (newBook == null) return;
-                              final chapters = await BibleService.getChapters(
-                                selectedVersions.first,
-                                newBook,
-                              );
-                              setState(() {
-                                book = newBook;
-                                chapter = 1;
-                                allChapters = chapters;
-                              });
-                              await _loadVerses();
-                            },
-                            items:
-                                filteredBooks.map((b) {
-                                  return DropdownMenuItem<String>(
-                                    value: b.slug,
-                                    child: Text(
-                                      b.name,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  );
-                                }).toList(),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        DropdownButton<int>(
-                          value: chapter,
-                          onChanged: (newChapter) {
-                            if (newChapter != null) {
-                              setState(() {
-                                chapter = newChapter;
-                              });
-                              _loadVerses();
-                            }
-                          },
-                          items:
-                              allChapters.map((c) {
-                                return DropdownMenuItem<int>(
-                                  value: c,
-                                  child: Text('$c장'),
-                                );
-                              }).toList(),
-                        ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 8),
+                      DropdownButton<int>(
+                        value: chapter,
+                        onChanged: (newChapter) {
+                          if (newChapter != null) {
+                            setState(() {
+                              chapter = newChapter;
+                            });
+                            _loadVerses();
+                          }
+                        },
+                        items: allChapters.map((c) {
+                          return DropdownMenuItem<int>(
+                            value: c,
+                            child: Text('$c장'),
+                          );
+                        }).toList(),
+                      ),
+                    ],
                   ),
-                  Expanded(child: _buildVerseComparison()),
-                ],
-              ),
+                ),
+                Expanded(child: _buildVerseComparison()),
+              ],
+            ),
     );
   }
 }
