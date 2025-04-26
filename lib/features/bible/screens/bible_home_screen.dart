@@ -1,9 +1,11 @@
+// bible_home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ourlife/features/bible/services/bible_service.dart';
 import 'package:ourlife/features/bible/models.dart';
 
 
+// 성경 본문 보기 화면 위젯
 class BibleHomeScreen extends StatefulWidget {
   const BibleHomeScreen({super.key});
 
@@ -11,21 +13,33 @@ class BibleHomeScreen extends StatefulWidget {
   State<BibleHomeScreen> createState() => _BibleHomeScreenState();
 }
 
+// BibleHomeScreen의 상태를 관리하는 클래스
 class _BibleHomeScreenState extends State<BibleHomeScreen> {
+  // 자동 스크롤을 위한 ScrollController
   final ScrollController _scrollController = ScrollController();
+
+  // 성경 버전, 책, 장 리스트, 절 위젯용 키 목록
   List<Version> allVersions = [];
   List<Book> allBooks = [];
   List<int> allChapters = [];
   List<GlobalKey> _verseKeys = [];
 
+  // 선택된 버전 및 현재 선택된 책/장 정보
   List<String> selectedVersions = [];
-  String testament = 'OT';
-  String book = '창';
-  int chapter = 1;
+  String testament = 'OT'; // 구약(OT), 신약(NT)
+  String book = '창'; // 책 이름 (slug)
+  int chapter = 1; // 장
+
+  // 폰트 크기
   double _fontSize = 16.0;
 
+  // 각 버전별 절 본문 데이터
   Map<String, List<Verse>> versesByVersion = {};
+
+  // 로딩 상태 플래그
   bool isLoading = true;
+
+  // 자동 스크롤을 위한 저장된 절 번호 및 오프셋
   int? _verseToScroll;
   double? _savedScrollOffset;
 
@@ -47,11 +61,12 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
     super.dispose();
   }
 
+  // 스크롤 시 현재 절 위치와 오프셋 저장
   void _onScroll() async {
     if (_scrollController.hasClients) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble('last_scroll_offset', _scrollController.offset);
-      
+
       final firstVisibleItem = _getFirstVisibleVerse();
       if (firstVisibleItem != null) {
         await prefs.setInt('last_verse', firstVisibleItem + 1);
@@ -59,13 +74,14 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
     }
   }
 
+  // 현재 화면에 보이는 첫 번째 절 인덱스를 계산
   int? _getFirstVisibleVerse() {
     if (!_scrollController.hasClients || _verseKeys.isEmpty) return null;
-    
+
     final scrollPosition = _scrollController.position;
     final viewportHeight = scrollPosition.viewportDimension;
     final scrollOffset = scrollPosition.pixels + viewportHeight * 0.1;
-    
+
     for (int i = 0; i < _verseKeys.length; i++) {
       final keyContext = _verseKeys[i].currentContext;
       if (keyContext != null) {
@@ -79,6 +95,7 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
     return null;
   }
 
+  // 초기 설정값 및 성경 데이터 불러오기
   Future<void> _loadInitialData() async {
     final prefs = await SharedPreferences.getInstance();
     final savedVersions = prefs.getStringList('selected_versions') ?? ['우리말'];
@@ -117,6 +134,7 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
     await _loadVerses();
   }
 
+  // 절 본문을 API로 불러오고 상태를 갱신
   Future<void> _loadVerses() async {
     setState(() {
       isLoading = true;
@@ -142,11 +160,13 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
       isLoading = false;
     });
 
+    // 화면 렌더링 후 스크롤 위치 복원
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _restoreScrollPosition();
     });
   }
 
+  // 이전 절 위치나 오프셋으로 스크롤 복원
   void _restoreScrollPosition() {
     if (_verseToScroll != null && _verseToScroll! > 0) {
       final indexToScroll = _verseToScroll! - 1;
@@ -170,17 +190,18 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
     }
   }
 
+  // 폰트 크기를 저장
   Future<void> _saveFontSize() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('font_size', _fontSize);
   }
 
+  // 성경 버전 선택 및 순서 조정 다이얼로그
   void _selectVersions() async {
     final selected = await showDialog<List<String>>(
       context: context,
       builder: (context) {
         List<String> temp = List<String>.from(selectedVersions);
-
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
@@ -190,6 +211,7 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
                 height: 400,
                 child: Column(
                   children: [
+                    // 드래그로 순서 조정 및 체크박스 선택 UI
                     Expanded(
                       child: ReorderableListView.builder(
                         buildDefaultDragHandles: false,
@@ -238,6 +260,7 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
+                    // 확인 및 취소 버튼
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -274,6 +297,7 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
     }
   }
 
+  // 폰트 크기 증가
   void _increaseFontSize() {
     setState(() {
       _fontSize += 2;
@@ -281,6 +305,7 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
     _saveFontSize();
   }
 
+  // 폰트 크기 감소
   void _decreaseFontSize() {
     setState(() {
       _fontSize = (_fontSize - 2).clamp(10.0, 40.0);
@@ -288,6 +313,7 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
     _saveFontSize();
   }
 
+  // 절 단위 비교 뷰 빌더
   Widget _buildVerseComparison() {
     final verseCount = versesByVersion.values.isNotEmpty
         ? versesByVersion.values.first.length
@@ -353,6 +379,7 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
     );
   }
 
+  // 메인 UI 빌드
   @override
   Widget build(BuildContext context) {
     final filteredBooks = allBooks.where((b) => b.testament == testament).toList();
@@ -379,11 +406,9 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                // 상단 드롭다운 (신약/구약, 책, 장)
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   child: Row(
                     children: [
                       DropdownButton<String>(
@@ -392,9 +417,7 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
                           if (newTestament == null) return;
                           final prefs = await SharedPreferences.getInstance();
                           final savedBook = prefs.getString('last_book_$newTestament') ??
-                              allBooks.firstWhere(
-                                (b) => b.testament == newTestament,
-                              ).slug;
+                              allBooks.firstWhere((b) => b.testament == newTestament).slug;
                           final savedChapter = prefs.getInt('last_chapter_$newTestament') ?? 1;
 
                           final chapters = await BibleService.getChapters(
@@ -466,6 +489,7 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
                     ],
                   ),
                 ),
+                // 절 비교 리스트
                 Expanded(child: _buildVerseComparison()),
               ],
             ),
