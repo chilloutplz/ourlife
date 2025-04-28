@@ -1,75 +1,30 @@
 // lib/router/app_router.dart
 import 'package:flutter/material.dart';
-import '../home_screen.dart';
-import 'package:ourlife/features/accounts/screens/login_screen.dart';
-import 'package:ourlife/features/accounts/screens/register_screen.dart';
-
-import 'package:ourlife/features/bible/screens/bible_home_screen.dart';
-// import 'package:ourlife/features/bible/screens/book_list_screen.dart';
-// import 'package:ourlife/features/bible/screens/chapter_list_screen.dart';
-// import 'package:ourlife/features/bible/screens/verse_list_screen.dart';
-// import 'package:ourlife/features/bible/screens/verse_search_screen.dart';
-
-import 'package:ourlife/features/notes/screens/notes_home_screen.dart';
-import 'package:ourlife/features/notes/screens/note_edit_screen.dart';
+import '../features/accounts/accounts_router.dart';
+import '../features/bible/bible_router.dart';
+import '../features/notes/notes_router.dart';
 
 class AppRouter {
   static Route<dynamic> generateRoute(RouteSettings settings) {
-    // final args = settings.arguments;
-    switch (settings.name) {
-      case '/':
-        return MaterialPageRoute(builder: (_) => const LoginScreen());
-      case '/register':
-        return MaterialPageRoute(builder: (_) => const RegisterScreen());
-      case '/home':
-        return MaterialPageRoute(builder: (_) => const HomeScreen());
+    // Accounts 라우터 처리
+    final accountsRoute = AccountsRouter.generateRoute(settings);
+    if (accountsRoute != null) return accountsRoute;
 
-      case '/bible':
-        return MaterialPageRoute(builder: (_) => const BibleHomeScreen());
+    // Bible 라우터 처리
+    final bibleRoute = BibleRouter.generateRoute(settings);
+    if (bibleRoute != null) return bibleRoute;
 
-      // case '/bible/books':
-      //   final version = args as String;
-      //   return MaterialPageRoute(
-      //     builder: (_) => BookListScreen(version: version),
-      //   );
+    // Notes 라우터 처리
+    final notesRoute = NotesRouter.generateRoute(settings);
+    if (notesRoute != null) return notesRoute;
 
-      // case '/bible/chapters':
-      //   final map = args as Map<String, dynamic>;
-      //   return MaterialPageRoute(
-      //     builder:
-      //         (_) =>
-      //             ChapterListScreen(version: map['version'], book: map['book']),
-      //   );
-
-      // case '/bible/verses':
-      //   final map = args as Map<String, dynamic>;
-      //   return MaterialPageRoute(
-      //     builder:
-      //         (_) => VerseListScreen(
-      //           version: map['version'],
-      //           book: map['book'],
-      //           chapter: map['chapter'],
-      //         ),
-      //   );
-
-      // case '/bible/search':
-      //   return MaterialPageRoute(builder: (_) => const VerseSearchScreen());
-
-      case '/notes':
-        return MaterialPageRoute(builder: (_) => const NotesHomeScreen());
-
-      case '/notes/edit': // ✅ 설교노트 추가 화면
-        return MaterialPageRoute(builder: (_) => const NoteEditScreen());
-
-      default:
-        return MaterialPageRoute(
-          builder:
-              (_) => Scaffold(
-                body: Center(
-                  child: Text('No route defined for ${settings.name}'),
-                ),
-              ),
-        );
-    }
+    // 처리되지 않은 라우트
+    return MaterialPageRoute(
+      builder: (_) => Scaffold(
+        body: Center(
+          child: Text('No route defined for ${settings.name}'),
+        ),
+      ),
+    );
   }
 }

@@ -23,6 +23,9 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
 
   final List<_Passage> _passages = [];
 
+  // 저장 버튼 활성화 여부를 관리하는 변수
+  bool _isSaveButtonActive = false;
+
   @override
   void initState() {
     super.initState();
@@ -34,18 +37,23 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     _pastorFocusNode = FocusNode();
     _titleFocusNode = FocusNode();
 
+    // 화면이 빌드된 후 설교자 입력 필드에 포커스를 줍니다.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _pastorFocusNode.requestFocus();
     });
 
+    // 기존 노트의 본문 정보가 있다면 파싱하여 _passages 리스트에 추가합니다.
     if (widget.note?.biblePassage != null) {
       final passages = widget.note!.biblePassage!
-          .split(';')
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .map(_Passage.fromString);
+          .split(';') // 세미콜론으로 구분된 각 구절을 분리합니다.
+          .map((s) => s.trim()) // 각 구절의 앞뒤 공백을 제거합니다.
+          .where((s) => s.isNotEmpty) // 빈 문자열은 제외합니다.
+          .map(_Passage.fromString); // 문자열 형태의 구절을 _Passage 객체로 변환합니다.
       _passages.addAll(passages);
     }
+
+    // 텍스트 필드의 변경을 감지하여 저장 버튼 활성화 상태를 업데이트합니다.
+    _contentController.addListener(_updateSaveButtonState);
   }
 
   @override
@@ -55,9 +63,12 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     _pastorController.dispose();
     _pastorFocusNode.dispose();
     _titleFocusNode.dispose();
+    // 텍스트 컨트롤러 리스너를 제거하여 메모리 누수를 방지합니다.
+    _contentController.removeListener(_updateSaveButtonState);
     super.dispose();
   }
 
+  // 설교일자를 선택하는 함수
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -66,15 +77,19 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       lastDate: DateTime(2100),
       locale: const Locale('ko'),
     );
+    // 날짜가 선택되면 상태를 업데이트하고 저장 버튼 상태를 업데이트합니다.
     if (picked != null) {
       setState(() => _selectedDate = picked);
+      _updateSaveButtonState();
     }
   }
 
+  // 선택된 날짜를 지정된 형식으로 변환하는 함수
   String _formatDate(DateTime date) {
     return DateFormat('yyyy년 MM월 dd일', 'ko').format(date);
   }
 
+  // 성경 본문 추가 모달을 여는 함수
   void _openBiblePassageModal() {
     showModalBottomSheet(
       context: context,
@@ -98,11 +113,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                           items:
                               ['신약', '구약']
                                   .map(
-                                    (v) => DropdownMenuItem(
-                                      value: v,
-                                      child: Text(v),
-                                    ),
-                                  )
+                                      (v) => DropdownMenuItem(
+                                        value: v,
+                                        child: Text(v),
+                                      ),
+                                    )
                                   .toList(),
                           onChanged: (v) => modalSetState(() => testament = v!),
                         ),
@@ -115,11 +130,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                           items:
                               ['창세기', '출애굽기', '요한복음']
                                   .map(
-                                    (b) => DropdownMenuItem(
-                                      value: b,
-                                      child: Text(b),
-                                    ),
-                                  )
+                                      (b) => DropdownMenuItem(
+                                        value: b,
+                                        child: Text(b),
+                                      ),
+                                    )
                                   .toList(),
                           onChanged: (v) => modalSetState(() => book = v),
                         ),
@@ -135,11 +150,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                           items:
                               List.generate(150, (i) => i + 1)
                                   .map(
-                                    (n) => DropdownMenuItem(
-                                      value: n,
-                                      child: Text('$n 장'),
-                                    ),
-                                  )
+                                      (n) => DropdownMenuItem(
+                                        value: n,
+                                        child: Text('$n 장'),
+                                      ),
+                                    )
                                   .toList(),
                           onChanged: (v) {
                             if (v != null) {
@@ -158,11 +173,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                           items:
                               List.generate(176, (i) => i + 1)
                                   .map(
-                                    (n) => DropdownMenuItem(
-                                      value: n,
-                                      child: Text('$n 절'),
-                                    ),
-                                  )
+                                      (n) => DropdownMenuItem(
+                                        value: n,
+                                        child: Text('$n 절'),
+                                      ),
+                                    )
                                   .toList(),
                           onChanged: (v) {
                             if (v != null) {
@@ -183,11 +198,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                           items:
                               List.generate(150, (i) => i + 1)
                                   .map(
-                                    (n) => DropdownMenuItem(
-                                      value: n,
-                                      child: Text('$n 장'),
-                                    ),
-                                  )
+                                      (n) => DropdownMenuItem(
+                                        value: n,
+                                        child: Text('$n 장'),
+                                      ),
+                                    )
                                   .toList(),
                           onChanged: (v) {
                             if (v != null) modalSetState(() => endChap = v);
@@ -201,11 +216,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                           items:
                               List.generate(176, (i) => i + 1)
                                   .map(
-                                    (n) => DropdownMenuItem(
-                                      value: n,
-                                      child: Text('$n 절'),
-                                    ),
-                                  )
+                                      (n) => DropdownMenuItem(
+                                        value: n,
+                                        child: Text('$n 절'),
+                                      ),
+                                    )
                                   .toList(),
                           onChanged: (v) {
                             if (v != null) modalSetState(() => endVer = v);
@@ -249,6 +264,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     );
   }
 
+  // 노트를 저장하고 이전 화면으로 돌아가는 함수
   void _saveNote() {
     Navigator.pop(
       context,
@@ -262,6 +278,13 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         biblePassage: _passages.map((p) => p.displayText).join('; '),
       ),
     );
+  }
+
+  // 저장 버튼의 활성화 상태를 업데이트하는 함수
+  void _updateSaveButtonState() {
+    setState(() {
+      _isSaveButtonActive = _contentController.text.trim().isNotEmpty; //&& _selectedDate != null;
+    });
   }
 
   @override
@@ -364,6 +387,9 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                       ),
                       maxLines: null,
                       keyboardType: TextInputType.multiline,
+                      style: const TextStyle(fontSize: 16, color: Colors.white),
+                      // 내용이 변경될 때마다 저장 버튼 상태를 업데이트합니다.
+                      onChanged: (value) => _updateSaveButtonState(),
                     ),
                   ],
                 ),
@@ -376,9 +402,9 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   padding: EdgeInsets.zero,
-                  // textStyle: const TextStyle(fontSize: 16),
                 ),
-                onPressed: _saveNote,
+                // 저장 버튼이 활성화되었을 때만 _saveNote 함수를 호출합니다.
+                onPressed: _isSaveButtonActive ? _saveNote : null,
                 child: const Text('저장', style: TextStyle(fontSize: 16)),
               ),
             ),
@@ -388,6 +414,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     );
   }
 
+  // 섹션 제목 위젯을 생성하는 함수
   Widget _buildSectionLabel(String text) {
     return Text(
       text,
@@ -396,6 +423,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   }
 }
 
+// 성경 구절 정보를 담는 클래스
 class _Passage {
   final String testament;
   final String book;
@@ -410,6 +438,7 @@ class _Passage {
     required this.endVer,
   });
 
+  // 화면에 표시될 구절 텍스트를 생성하는 getter
   String get displayText {
     final start = '$startChap:$startVer';
     final end = '$endChap:$endVer';
@@ -418,6 +447,7 @@ class _Passage {
         : '$testament $book $start ~ $end';
   }
 
+  // 문자열 형태의 구절 정보를 파싱하여 _Passage 객체를 생성하는 factory 생성자
   factory _Passage.fromString(String s) {
     final parts = s.split(' ');
     final testament = parts[0];
