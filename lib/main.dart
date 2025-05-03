@@ -9,7 +9,6 @@ import 'providers/theme_provider.dart';
 
 import 'package:ourlife/theme/theme.dart';
 import 'package:ourlife/router/app_router.dart';
-import 'package:ourlife/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,10 +46,6 @@ class MyApp extends StatelessWidget {
         Locale('ko'), // 한국어
         Locale('en'), // 영어
       ],
-      routes: {
-        '/home': (context) => const HomeScreen(),
-        // 다른 라우트 추가 가능
-      },
     );
   }
 }
