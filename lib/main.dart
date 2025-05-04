@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'providers/theme_provider.dart';
@@ -15,26 +15,27 @@ void main() async {
   await initializeDateFormatting('ko_KR', null); // 한글 날짜 포맷 초기화
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeNotifier(),
-      child: const MyApp(),
+    const ProviderScope(
+      child: MyApp(),
     ),
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final themeNotifier = Provider.of<ThemeNotifier>(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    // final themeNotifier = ref.watch(themeNotifierProvider); // 테마 프로바이더를 사용하여 현재 테마를 가져옴
+    final isDark = ref.watch(themeNotifierProvider); // bool 값 (true/false)
+    final themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'OurLife',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: themeNotifier.currentTheme, // 현재 테마에 따라 다크모드 또는 라이트모드 적용
+      themeMode: themeMode, // 현재 테마에 따라 다크모드 또는 라이트모드 적용
       initialRoute: '/home',
       onGenerateRoute: AppRouter.generateRoute,
       localizationsDelegates: const [

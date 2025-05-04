@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class ThemeNotifier with ChangeNotifier {
-  bool _isDark = true; // 기본 테마는 다크모드
+class ThemeNotifier extends StateNotifier<bool> {
+  ThemeNotifier() : super(true); // 기본 테마: 다크 모드
 
-  bool get isDark => _isDark;
+  bool get isDark => state;
 
   void toggleTheme() {
-    _isDark = !_isDark;
-    notifyListeners(); // 테마 변경을 위젯 트리에 알림
+    state = !state;
   }
 
-  ThemeMode get currentTheme => _isDark ? ThemeMode.dark : ThemeMode.light;
+  ThemeMode get currentTheme => state ? ThemeMode.dark : ThemeMode.light;
 }
+
+// 전역 Provider
+// ✅ StateNotifierProvider로 수정
+final themeNotifierProvider =
+    StateNotifierProvider<ThemeNotifier, bool>((ref) => ThemeNotifier());
