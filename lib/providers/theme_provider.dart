@@ -1,19 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class ThemeNotifier extends StateNotifier<bool> {
-  ThemeNotifier() : super(true); // 기본 테마: 다크 모드
+final themeModeProvider = FutureProvider<ThemeMode>((ref) async {
+  final prefs = await SharedPreferences.getInstance();
+  final index = prefs.getInt('theme_mode') ?? ThemeMode.system.index;
+  return ThemeMode.values[index];
+});
 
-  bool get isDark => state;
+final themeNotifierProvider = StateNotifierProvider<ThemeNotifier, ThemeMode>(
+  (ref) => throw UnimplementedError('Must be overridden later'),
+);
 
-  void toggleTheme() {
-    state = !state;
+class ThemeNotifier extends StateNotifier<ThemeMode> {
+  ThemeNotifier(super.initialMode);
+
+  Future<void> toggleTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = (state == ThemeMode.light) ? ThemeMode.dark : ThemeMode.light;
+    await prefs.setInt('theme_mode', state.index);
   }
 
-  ThemeMode get currentTheme => state ? ThemeMode.dark : ThemeMode.light;
+  Future<void> setTheme(ThemeMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    state = mode;
+    await prefs.setInt('theme_mode', state.index);
+  }
 }
-
-// 전역 Provider
-// ✅ StateNotifierProvider로 수정
-final themeNotifierProvider =
-    StateNotifierProvider<ThemeNotifier, bool>((ref) => ThemeNotifier());
