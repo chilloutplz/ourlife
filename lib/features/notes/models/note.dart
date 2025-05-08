@@ -1,3 +1,4 @@
+// ourlife/lib/features/notes/models/note.dart
 class Note {
   final String id;
   final String title;

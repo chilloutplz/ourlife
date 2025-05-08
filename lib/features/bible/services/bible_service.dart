@@ -1,7 +1,7 @@
 // bible_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../../../constants/constants.dart';
+import 'package:ourlife/constants/constants.dart';
 import '../models.dart';
 
 class BibleService {
