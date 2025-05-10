@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:ourlife/constants/constants.dart';
 import 'package:ourlife/widgets/bootstrap_card.dart';
+import 'package:ourlife/theme/bootstrap_theme.dart';
 
 class TodayVerseCard extends StatefulWidget {
   const TodayVerseCard({super.key});
@@ -58,7 +59,32 @@ class _TodayVerseCardState extends State<TodayVerseCard> {
       type: BootstrapCardType.info,
       twoTone: true,
       outline: true,
-      header: const Text('오늘의 말씀'),
+      header: SizedBox(
+        height: 20, // 고정된 높이 설정
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              '오늘의 말씀',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh, size: 20), // 아이콘 크기 조정
+              color: BootstrapColors.light, // 아이콘 색상
+              tooltip: '새로고침',
+              onPressed: fetchRandomVerse, // 새로고침 기능
+              constraints: const BoxConstraints(
+                minWidth: 32,
+                minHeight: 32, // 버튼 크기 제한
+              ),
+              padding: EdgeInsets.zero, // 내부 여백 제거
+            ),
+          ],
+        ),
+      ),
       headerAlignment: Alignment.center,
       // body: 로딩 중이면 스피너, 에러면 에러 메시지, 아니면 본문
       body: isLoading
@@ -79,9 +105,9 @@ class _TodayVerseCardState extends State<TodayVerseCard> {
               child: const Text('다시 시도'),
             )
           : Text(
-              reference,
+              "- $reference",
               style: TextStyle(
-                color: cs.onSurface.withValues(),
+                color: cs.onSurface.withAlpha(255),
                 fontSize: 14,
               ),
             ),

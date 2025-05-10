@@ -4,12 +4,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 final themeModeProvider = FutureProvider<ThemeMode>((ref) async {
   final prefs = await SharedPreferences.getInstance();
-  final index = prefs.getInt('theme_mode') ?? ThemeMode.system.index;
+  final index = prefs.getInt('theme_mode') ?? ThemeMode.dark.index; // 기본값을 ThemeMode.dark로 설정
   return ThemeMode.values[index];
 });
 
 final themeNotifierProvider = StateNotifierProvider<ThemeNotifier, ThemeMode>(
-  (ref) => throw UnimplementedError('Must be overridden later'),
+  (ref) => ThemeNotifier(ThemeMode.dark), // 초기값을 ThemeMode.dark로 설정
 );
 
 class ThemeNotifier extends StateNotifier<ThemeMode> {

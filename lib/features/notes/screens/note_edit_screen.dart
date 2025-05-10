@@ -6,6 +6,8 @@ import '../models/note.dart';
 import '../../bible/services/bible_service.dart';
 import '../../bible/models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/database_helper.dart';
+import 'package:ourlife/theme/bootstrap_theme.dart';
 
 class NoteEditScreen extends StatefulWidget {
   final Note? note;
@@ -25,14 +27,12 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   late final FocusNode _titleFocusNode;
   DateTime _selectedDate = DateTime.now();
   bool _isSidePanelVisible = false;
-  List<RichText> _selectedPassageText = [];
   Map<String, List<Verse>> versesByVersion = {};
 
   final List<Passage> _passages = [];
+  double _sidePanelFontSize = 14.0; 
 
-  // 저장 버튼 활성화 여부를 관리하는 변수
   bool _isSaveButtonActive = false;
-
   final String _selectedTestament = 'OT';
 
   @override
@@ -47,23 +47,69 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     _pastorFocusNode = FocusNode();
     _titleFocusNode = FocusNode();
 
-    // 화면이 빌드된 후 설교자 입력 필드에 포커스를 줍니다.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _pastorFocusNode.requestFocus();
+      if (mounted) { 
+        _pastorFocusNode.requestFocus();
+      }
     });
 
-    // 기존 노트의 본문 정보가 있다면 파싱하여 _passages 리스트에 추가합니다.
     if (widget.note?.biblePassage != null) {
-      final passages = widget.note!.biblePassage!
-          .split(';') // 세미콜론으로 구분된 각 구절을 분리합니다.
-          .map((s) => s.trim()) // 각 구절의 앞뒤 공백을 제거합니다.
-          .where((s) => s.isNotEmpty) // 빈 문자열은 제외합니다.
-          .map(Passage.fromString); // 문자열 형태의 구절을 Passage 객체로 변환합니다.
-      _passages.addAll(passages);
+      try {
+        final passages = widget.note!.biblePassage!
+            .split(';')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .map((s) {
+              try {
+                return Passage.fromString(s);
+              } catch (e) {
+                debugPrint('Error parsing individual passage: $s, error: $e');
+                return null;
+              }
+            })
+            .where((p) => p != null)
+            .cast<Passage>()
+            .toList();
+        
+        _passages.addAll(passages);
+        _loadPassageContents(passages);
+      } catch (e) {
+        debugPrint('Error parsing biblePassage: ${widget.note!.biblePassage}, error: $e');
+      }
     }
 
-    // 텍스트 필드의 변경을 감지하여 저장 버튼 활성화 상태를 업데이트합니다.
+    _titleController.addListener(_updateSaveButtonState);
     _contentController.addListener(_updateSaveButtonState);
+    _loadSidePanelFontSize();
+  }
+
+  Future<void> _loadSidePanelFontSize() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _sidePanelFontSize = prefs.getDouble('noteEditScreen_sidePanelFontSize') ?? 14.0;
+    });
+  }
+
+  Future<void> _saveSidePanelFontSize() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('noteEditScreen_sidePanelFontSize', _sidePanelFontSize);
+  }
+
+  void _increaseSidePanelFontSize() {
+    if (!mounted) return;
+    setState(() {
+      _sidePanelFontSize = (_sidePanelFontSize + 1.0).clamp(10.0, 24.0);
+    });
+    _saveSidePanelFontSize();
+  }
+
+  void _decreaseSidePanelFontSize() {
+    if (!mounted) return;
+    setState(() {
+      _sidePanelFontSize = (_sidePanelFontSize - 1.0).clamp(10.0, 24.0);
+    });
+    _saveSidePanelFontSize();
   }
 
   @override
@@ -74,12 +120,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     _passageController.dispose();
     _pastorFocusNode.dispose();
     _titleFocusNode.dispose();
-    // 텍스트 컨트롤러 리스너를 제거하여 메모리 누수를 방지합니다.
+    _titleController.removeListener(_updateSaveButtonState);
     _contentController.removeListener(_updateSaveButtonState);
     super.dispose();
   }
 
-  // 설교일자를 선택하는 함수
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -88,121 +133,124 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       lastDate: DateTime(2100),
       locale: const Locale('ko'),
     );
-    // 날짜가 선택되면 상태를 업데이트하고 저장 버튼 상태를 업데이트합니다.
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() => _selectedDate = picked);
       _updateSaveButtonState();
     }
   }
 
-  // 선택된 날짜를 지정된 형식으로 변환하는 함수
   String _formatDate(DateTime date) {
     return DateFormat('yyyy년 MM월 dd일', 'ko').format(date);
   }
 
-  // 성경 본문 추가 모달을 여는 함수
   void _openBiblePassageModal() {
     showDialog(
       context: context,
       builder: (dialogContext) => BiblePassageSelector(
         initialTestament: _selectedTestament,
         onPassageSelected: (passage) async {
+          if (!mounted) return;
           setState(() {
             _passages.add(passage);
           });
+          final currentPassageIndex = _passages.length - 1;
 
           Navigator.pop(dialogContext);
 
-          // 선택된 구절의 본문을 가져옵니다
           try {
             final prefs = await SharedPreferences.getInstance();
             final selectedVersions = prefs.getStringList('selected_versions') ?? ['우리말'];
             
-            // 각 버전별로 본문 가져오기
-            versesByVersion.clear();
-            for (var version in selectedVersions) {
-              final verses = await BibleService.getVerses(version, passage.book, passage.startChap);
-              versesByVersion[version] = verses;
+            Map<String, List<Verse>> fetchedVersesForRangeByVersion = {};
+            for (var versionName in selectedVersions) {
+              List<Verse> aggregatedVersesForThisVersion = [];
+              for (int chap = passage.startChap; chap <= passage.endChap; chap++) {
+                final chapterVerses = await BibleService.getVerses(versionName, passage.book, chap);
+                aggregatedVersesForThisVersion.addAll(chapterVerses);
+              }
+              fetchedVersesForRangeByVersion[versionName] = aggregatedVersesForThisVersion;
             }
 
             if (!mounted) return;
 
-            // 첫 번째 버전의 절 범위 찾기
-            final firstVersion = selectedVersions.first;
-            final verses = versesByVersion[firstVersion] ?? [];
-            final startIndex = verses.indexWhere((v) => v.number == passage.startVer);
-            final endIndex = verses.indexWhere((v) => v.number == passage.endVer);
+            final firstSelectedVersionName = selectedVersions.first;
+            final List<Verse> referenceVerseList = fetchedVersesForRangeByVersion[firstSelectedVersionName] ?? [];
 
-            if (startIndex != -1 && endIndex != -1) {
-              // 책 이름 가져오기 (첫 번째 버전 기준)
-              final books = await BibleService.getBooks(firstVersion);
+            final int actualStartIndex = referenceVerseList.indexWhere(
+                (v) => v.chapter == passage.startChap && v.number == passage.startVer);
+            final int actualEndIndex = referenceVerseList.indexWhere(
+                (v) => v.chapter == passage.endChap && v.number == passage.endVer);
+
+            if (actualStartIndex != -1 && actualEndIndex != -1 && actualStartIndex <= actualEndIndex) {
+              final books = await BibleService.getBooks(firstSelectedVersionName);
               final bookName = books.firstWhere((book) => book.slug == passage.book).name;
               
-              // 책과 장을 제목으로 표시
-              final titleText = RichText(
-                text: TextSpan(
-                  text: '$bookName ${passage.startChap}장',
-                  style: const TextStyle(
-                    color: Colors.blue,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+              String chapterDisplay = passage.startChap == passage.endChap 
+                  ? '${passage.startChap}장' 
+                  : '${passage.startChap}-${passage.endChap}장';
+              
+              final titleSpan = TextSpan(
+                text: '$bookName $chapterDisplay',
+                style: const TextStyle( 
+                  color: Colors.blue,
+                  fontWeight: FontWeight.bold,
                 ),
               );
 
-              // 각 절마다 모든 버전의 본문을 교대로 표시
-              final versesText = <RichText>[];
-              for (var i = startIndex; i <= endIndex; i++) {
-                final verseNumber = verses[i].number;
-                var isFirstVersion = true;
+              final verseSpans = <TextSpan>[];
+              for (int i = actualStartIndex; i <= actualEndIndex; i++) {
+                final Verse refVerse = referenceVerseList[i];
+                final int currentChapter = refVerse.chapter;
+                final int currentVerseNum = refVerse.number;
+                var isFirstVersionForThisVerse = true; 
                 
-                // 각 버전의 해당 절 본문 표시
-                for (var version in selectedVersions) {
-                  final versionVerses = versesByVersion[version] ?? [];
-                  if (versionVerses.isNotEmpty) {
-                    final verse = versionVerses[i];
-                    versesText.add(RichText(
-                      text: TextSpan(
-                        children: [
-                          if (isFirstVersion) TextSpan(
-                            text: '$verseNumber ',
-                            style: const TextStyle(
-                              color: Colors.blue,
-                              fontWeight: FontWeight.bold,
-                            ),
+                for (var versionName in selectedVersions) {
+                  final List<Verse> versesOfThisVersion = fetchedVersesForRangeByVersion[versionName] ?? [];
+                  Verse? actualVerseToDisplay;
+                  try {
+                    actualVerseToDisplay = versesOfThisVersion.firstWhere(
+                        (v) => v.chapter == currentChapter && v.number == currentVerseNum);
+                  } catch (e) {
+                    // Verse not found
+                  }
+
+                  if (actualVerseToDisplay != null) {
+                    verseSpans.add(TextSpan( 
+                      children: [
+                        if (isFirstVersionForThisVerse) TextSpan(
+                          text: '$currentVerseNum ',
+                          style: const TextStyle( 
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
                           ),
-                          TextSpan(
-                            text: '[$version] ',
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                            ),
+                        ),
+                        TextSpan(
+                          text: '[$versionName] ',
+                          style: const TextStyle( 
+                            color: Colors.grey,
+                            fontStyle: FontStyle.italic,
                           ),
-                          TextSpan(
-                            text: verse.text,
-                            style: const TextStyle(
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                        TextSpan(
+                          text: actualVerseToDisplay.text,
+                           style: const TextStyle(color: Colors.white), 
+                        ),
+                      ],
                     ));
-                    isFirstVersion = false;
+                    isFirstVersionForThisVerse = false;
                   }
                 }
               }
-
+              
+              if (!mounted) return;
               setState(() {
-                if (_selectedPassageText.isEmpty) {
-                  _selectedPassageText = [titleText, ...versesText];
-                } else {
-                  _selectedPassageText = [..._selectedPassageText, titleText, ...versesText];
+                if (currentPassageIndex < _passages.length) {
+                    _passages[currentPassageIndex].titleSpan = titleSpan;
+                    _passages[currentPassageIndex].verseSpans = verseSpans;
                 }
                 _isSidePanelVisible = true;
               });
 
-              // 1초 후에 사이드 패널 닫기
               Future.delayed(const Duration(seconds: 1), () {
                 if (mounted) {
                   setState(() {
@@ -223,28 +271,204 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     );
   }
 
-  // 노트를 저장하고 이전 화면으로 돌아가는 함수
-  void _saveNote() {
-    Navigator.pop(
-      context,
-      Note(
-        id: widget.note?.id ?? DateTime.now().toString(),
-        title: _titleController.text,
-        content: _contentController.text,
-        createdAt: widget.note?.createdAt ?? DateTime.now(),
-        preachedAt: _selectedDate,
-        pastor: _pastorController.text,
-        biblePassage: _passages.map((p) => p.displayText).join('; '),
-      ),
+  Future<void> _saveNote() async {
+    final note = Note(
+      id: widget.note?.id ?? DateTime.now().toString(),
+      title: _titleController.text.trim(),
+      content: _contentController.text.trim(),
+      createdAt: widget.note?.createdAt ?? DateTime.now(),
+      preachedAt: _selectedDate,
+      pastor: _pastorController.text.trim(),
+      biblePassage: _passages.map((p) => p.displayText).join('; '),
+    );
+
+    try {
+      if (widget.note == null) {
+        await DatabaseHelper.instance.insertNote(note);
+      } else {
+        await DatabaseHelper.instance.updateNote(note);
+      }
+      
+      if (mounted) {
+        Navigator.pop(context, note);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('노트 저장 중 오류가 발생했습니다: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _updateSaveButtonState() {
+    if (!mounted) return;
+    setState(() {
+      _isSaveButtonActive = _titleController.text.trim().isNotEmpty || 
+                          _contentController.text.trim().isNotEmpty;
+    });
+  }
+
+  Future<void> _loadPassageContents(List<Passage> passagesToLoad) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final selectedVersions = prefs.getStringList('selected_versions') ?? ['우리말'];
+
+      for (int passageIdx = 0; passageIdx < passagesToLoad.length; passageIdx++) {
+        final passage = passagesToLoad[passageIdx];
+        Map<String, List<Verse>> fetchedVersesForRangeByVersion = {};
+        for (var versionName in selectedVersions) {
+          List<Verse> aggregatedVersesForThisVersion = [];
+          for (int chap = passage.startChap; chap <= passage.endChap; chap++) {
+            final chapterVerses = await BibleService.getVerses(versionName, passage.book, chap);
+            aggregatedVersesForThisVersion.addAll(chapterVerses);
+          }
+          fetchedVersesForRangeByVersion[versionName] = aggregatedVersesForThisVersion;
+        }
+
+        if (!mounted) return;
+
+        final firstSelectedVersionName = selectedVersions.first;
+        final List<Verse> referenceVerseList = fetchedVersesForRangeByVersion[firstSelectedVersionName] ?? [];
+
+        final int actualStartIndex = referenceVerseList.indexWhere(
+            (v) => v.chapter == passage.startChap && v.number == passage.startVer);
+        final int actualEndIndex = referenceVerseList.indexWhere(
+            (v) => v.chapter == passage.endChap && v.number == passage.endVer);
+        
+        if (actualStartIndex != -1 && actualEndIndex != -1 && actualStartIndex <= actualEndIndex) {
+          final books = await BibleService.getBooks(firstSelectedVersionName);
+          final bookName = books.firstWhere((book) => book.slug == passage.book).name;
+          
+          String chapterDisplay = passage.startChap == passage.endChap 
+              ? '${passage.startChap}장' 
+              : '${passage.startChap}-${passage.endChap}장';
+          
+          final titleSpan = TextSpan(
+            text: '$bookName $chapterDisplay',
+            style: const TextStyle( 
+              color: Colors.blue,
+              fontWeight: FontWeight.bold,
+            ),
+          );
+
+          final verseSpans = <TextSpan>[];
+          for (int i = actualStartIndex; i <= actualEndIndex; i++) {
+            final Verse refVerse = referenceVerseList[i];
+            final int currentChapter = refVerse.chapter;
+            final int currentVerseNum = refVerse.number;
+            var isFirstVersionForThisVerse = true;
+            
+            for (var versionName in selectedVersions) {
+              final List<Verse> versesOfThisVersion = fetchedVersesForRangeByVersion[versionName] ?? [];
+              Verse? actualVerseToDisplay;
+              try {
+                actualVerseToDisplay = versesOfThisVersion.firstWhere(
+                    (v) => v.chapter == currentChapter && v.number == currentVerseNum);
+              } catch (e) {
+                // Verse not found
+              }
+
+              if (actualVerseToDisplay != null) {
+                verseSpans.add(TextSpan( 
+                  children: [
+                    if (isFirstVersionForThisVerse) TextSpan(
+                      text: '$currentVerseNum ',
+                      style: const TextStyle( 
+                        color: Colors.blue,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextSpan(
+                      text: '[$versionName] ',
+                      style: const TextStyle( 
+                        color: Colors.grey,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    TextSpan(
+                      text: actualVerseToDisplay.text,
+                      style: const TextStyle(color: Colors.white), 
+                    ),
+                  ],
+                ));
+                isFirstVersionForThisVerse = false;
+              }
+            }
+          }
+          
+          if (!mounted) return;
+          setState(() {
+            final indexInState = _passages.indexWhere((p) => 
+                p.book == passage.book && 
+                p.startChap == passage.startChap && p.startVer == passage.startVer &&
+                p.endChap == passage.endChap && p.endVer == passage.endVer
+            );
+            if (indexInState != -1) {
+                 _passages[indexInState].titleSpan = titleSpan;
+                 _passages[indexInState].verseSpans = verseSpans;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading passage contents: $e');
+    }
+  }
+
+  TextSpan _applyFontSizeToTextSpan(TextSpan? originalSpan, double baseFontSize, {bool isTitle = false}) {
+    if (originalSpan == null) return const TextSpan();
+
+    TextStyle newStyle = originalSpan.style ?? const TextStyle();
+
+    if (isTitle) {
+        newStyle = newStyle.copyWith(
+            fontSize: baseFontSize + 2.0, 
+            color: Colors.blue,
+            fontWeight: FontWeight.bold
+        );
+    } else {
+      if (originalSpan.text != null) {
+        if (originalSpan.text!.trim().endsWith(' ') && int.tryParse(originalSpan.text!.trim()) != null) { 
+          newStyle = newStyle.copyWith(
+            color: Colors.blue,
+            fontWeight: FontWeight.bold,
+            fontSize: baseFontSize
+          );
+        } else if (originalSpan.text!.startsWith('[') && originalSpan.text!.endsWith('] ')) { 
+          newStyle = newStyle.copyWith(
+            color: Colors.grey,
+            fontStyle: FontStyle.italic,
+            fontSize: (baseFontSize - 2.0).clamp(8.0, 22.0) 
+          );
+        } else { 
+          newStyle = newStyle.copyWith(fontSize: baseFontSize, color: Colors.white);
+        }
+      } else { 
+         newStyle = newStyle.copyWith(fontSize: baseFontSize, color: Colors.white);
+      }
+    }
+    
+    return TextSpan(
+      text: originalSpan.text,
+      children: originalSpan.children?.map((child) {
+        if (child is TextSpan) {
+          return _applyFontSizeToTextSpan(child, baseFontSize, isTitle: false);
+        }
+        return child; 
+      }).toList(),
+      style: newStyle,
+      recognizer: originalSpan.recognizer,
+      semanticsLabel: originalSpan.semanticsLabel,
+      mouseCursor: originalSpan.mouseCursor,
+      onEnter: originalSpan.onEnter,
+      onExit: originalSpan.onExit,
     );
   }
 
-  // 저장 버튼의 활성화 상태를 업데이트하는 함수
-  void _updateSaveButtonState() {
-    setState(() {
-      _isSaveButtonActive = _passageController.text.trim().isNotEmpty;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -255,6 +479,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
       body: GestureDetector(
         onTap: () {
           if (_isSidePanelVisible) {
+            if (!mounted) return;
             setState(() {
               _isSidePanelVisible = false;
             });
@@ -337,47 +562,10 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                                         size: 20,
                                       ),
                                       onPressed: () async {
-                                        final prefs = await SharedPreferences.getInstance();
-                                        final selectedVersions = prefs.getStringList('selected_versions') ?? ['우리말'];
-                                        
+                                        if (!mounted) return;
                                         setState(() {
-                                          // 해당 구절의 인덱스 찾기
-                                          final index = _passages.indexOf(p);
-                                          
-                                          // 사이드 패널에서 해당 구절의 내용 제거
-                                          if (index >= 0) {
-                                            // 이전 구절들의 총 길이 계산
-                                            int startIndex = 0;
-                                            for (int i = 0; i < index; i++) {
-                                              final prevPassage = _passages[i];
-                                              // 제목(1개) + (절 개수 * 버전 개수)
-                                              startIndex += 1 + ((prevPassage.endVer - prevPassage.startVer + 1) * selectedVersions.length).toInt();
-                                            }
-                                            
-                                            // 현재 구절의 길이 계산 (제목 + (절 개수 * 버전 개수))
-                                            final currentLength = 1 + ((p.endVer - p.startVer + 1) * selectedVersions.length).toInt();
-                                            
-                                            // 범위가 유효한지 확인하고 제거
-                                            if (startIndex < _selectedPassageText.length) {
-                                              final endIndex = startIndex + currentLength;
-                                              _selectedPassageText.removeRange(
-                                                startIndex,
-                                                endIndex > _selectedPassageText.length ? _selectedPassageText.length : endIndex
-                                              );
-                                            }
-                                          }
-                                          
                                           _passages.remove(p);
-                                          _isSidePanelVisible = true;
-                                        });
-
-                                        // 1초 후에 사이드 패널 닫기
-                                        Future.delayed(const Duration(seconds: 1), () {
-                                          if (mounted) {
-                                            setState(() {
-                                              _isSidePanelVisible = false;
-                                            });
-                                          }
+                                          _isSidePanelVisible = _passages.isNotEmpty; 
                                         });
                                       },
                                     ),
@@ -398,7 +586,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                                 ),
                                 const SizedBox(height: 20),
                                 TextField(
-                                  controller: _passageController,
+                                  controller: _contentController,
                                   decoration: const InputDecoration(
                                     hintText: '노트를 시작하세요',
                                     border: InputBorder.none,
@@ -458,6 +646,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                       bottomLeft: Radius.circular(24),
                     ),
                     onTap: () {
+                      if (!mounted) return;
                       setState(() {
                         _isSidePanelVisible = !_isSidePanelVisible;
                       });
@@ -498,11 +687,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                   ],
                 ),
                 child: GestureDetector(
-                  onTap: () {}, // 패널 내부 클릭은 무시
+                  onTap: () {}, 
                   child: Column(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                         decoration: BoxDecoration(
                           border: Border(
                             bottom: BorderSide(
@@ -512,22 +701,57 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                           ),
                         ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              '본문 내용',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.text_decrease),
+                                  iconSize: 20,
+                                  padding: const EdgeInsets.all(2),
+                                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30), // Slightly smaller touch area
+                                  onPressed: _decreaseSidePanelFontSize,
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.text_increase),
+                                  iconSize: 20,
+                                  padding: const EdgeInsets.all(2),
+                                  constraints: const BoxConstraints(minWidth: 30, minHeight: 30), // Slightly smaller touch area
+                                  onPressed: _increaseSidePanelFontSize,
+                                ),
+                              ],
+                            ),
+                            const Expanded(
+                              child: Text(
+                                '본문 내용',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.close),
-                              onPressed: () {
-                                setState(() {
-                                  _isSidePanelVisible = false;
-                                });
-                              },
+                            Container(
+                              width: 28, // Smaller width for the circle
+                              height: 28, // Smaller height for the circle
+                              margin: const EdgeInsets.only(left: 4), // Ensure some space from title
+                              decoration: BoxDecoration(
+                                color: BootstrapColors.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: const Icon(Icons.chevron_right),
+                                iconSize: 16, // Smaller icon
+                                color: Colors.white,
+                                padding: EdgeInsets.zero,
+                                alignment: Alignment.center,
+                                onPressed: () {
+                                  if (!mounted) return;
+                                  setState(() {
+                                    _isSidePanelVisible = false;
+                                  });
+                                },
+                              ),
                             ),
                           ],
                         ),
@@ -537,10 +761,46 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: _selectedPassageText.map((text) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: text,
-                            )).toList(),
+                            children: [
+                              if (_passages.isEmpty)
+                                const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(16.0),
+                                    child: Text(
+                                      '본문을 추가해주세요',
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                ..._passages.map((passage) => Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                        horizontal: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withAlpha(26),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: RichText(text: _applyFontSizeToTextSpan(passage.titleSpan, _sidePanelFontSize, isTitle: true)),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    if (passage.verseSpans != null) ...[
+                                      ...passage.verseSpans!.map((span) => Padding(
+                                        padding: const EdgeInsets.only(bottom: 8),
+                                        child: RichText(text: _applyFontSizeToTextSpan(span, _sidePanelFontSize)),
+                                      )),
+                                      const SizedBox(height: 16),
+                                    ],
+                                  ],
+                                )),
+                            ],
                           ),
                         ),
                       ),
@@ -555,7 +815,6 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     );
   }
 
-  // 섹션 제목 위젯을 생성하는 함수
   Widget _buildSectionLabel(String text) {
     return Text(
       text,
@@ -600,6 +859,7 @@ class _BiblePassageSelectorState extends State<BiblePassageSelector> {
   }
 
   Future<void> _loadInitialData() async {
+    if (!mounted) return;
     setState(() {
       _isLoadingBooks = true;
     });
@@ -614,7 +874,7 @@ class _BiblePassageSelectorState extends State<BiblePassageSelector> {
         return book.testament == 'NT';
       }
     }).toList();
-
+    if (!mounted) return;
     setState(() {
       _books = filteredBooks;
       if (filteredBooks.isNotEmpty) {
@@ -632,7 +892,6 @@ class _BiblePassageSelectorState extends State<BiblePassageSelector> {
   Future<void> _loadChapters() async {
     final chapters = await BibleService.getChapters('우리말', _selectedBook);
     if (!mounted) return;
-
     setState(() {
       _chapters = chapters;
       if (chapters.isNotEmpty) {
@@ -651,7 +910,6 @@ class _BiblePassageSelectorState extends State<BiblePassageSelector> {
   Future<void> _loadVerses() async {
     final verses = await BibleService.getVerses('우리말', _selectedBook, _selectedChapter);
     if (!mounted) return;
-
     setState(() {
       _verses = verses.map((v) => v.number).toList();
       if (_verses.isNotEmpty) {
@@ -681,6 +939,7 @@ class _BiblePassageSelectorState extends State<BiblePassageSelector> {
                   ],
                   onChanged: (value) async {
                     if (value != null) {
+                      if (!mounted) return;
                       setState(() {
                         _selectedTestament = value;
                         _selectedBook = '';
@@ -703,7 +962,7 @@ class _BiblePassageSelectorState extends State<BiblePassageSelector> {
                           return book.testament == 'NT';
                         }
                       }).toList();
-                      
+                      if (!mounted) return;
                       setState(() {
                         _books = filteredBooks;
                         if (filteredBooks.isNotEmpty) {
@@ -738,6 +997,7 @@ class _BiblePassageSelectorState extends State<BiblePassageSelector> {
                       ).toList(),
                       onChanged: _selectedBook.isEmpty ? null : (value) async {
                         if (value != null) {
+                           if (!mounted) return;
                           setState(() {
                             _selectedBook = value;
                             _selectedChapter = 1;
@@ -777,16 +1037,17 @@ class _BiblePassageSelectorState extends State<BiblePassageSelector> {
                           )).toList(),
                           onChanged: (v) async {
                             if (v != null) {
+                              if (!mounted) return;
                               setState(() {
                                 _selectedChapter = v;
                                 _selectedVerse = 1;
-                                _selectedEndChapter = v;
-                                _selectedEndVerse = 1;
+                                _selectedEndChapter = v; 
+                                _selectedEndVerse = 1; 
                                 _isLoadingVerses = true;
                                 _verses = [];
                               });
                               
-                              await _loadVerses();
+                              await _loadVerses(); 
                             }
                           },
                         ),
@@ -812,9 +1073,10 @@ class _BiblePassageSelectorState extends State<BiblePassageSelector> {
                           )).toList(),
                           onChanged: (v) {
                             if (v != null) {
+                              if (!mounted) return;
                               setState(() {
                                 _selectedVerse = v;
-                                if (_selectedEndChapter == _selectedChapter) {
+                                if (_selectedEndChapter == _selectedChapter) { 
                                   _selectedEndVerse = v;
                                 }
                               });
@@ -830,7 +1092,7 @@ class _BiblePassageSelectorState extends State<BiblePassageSelector> {
           Row(
             children: [
               Expanded(
-                child: _isLoadingChapters
+                child: _isLoadingChapters 
                   ? const Center(child: CircularProgressIndicator())
                   : Column(
                       children: [
@@ -845,15 +1107,18 @@ class _BiblePassageSelectorState extends State<BiblePassageSelector> {
                             value: n,
                             child: Text('$n'),
                           )).toList(),
-                          onChanged: (v) {
+                          onChanged: (v) async {
                             if (v != null) {
+                              if (!mounted) return;
                               setState(() {
                                 _selectedEndChapter = v;
-                                if (_selectedEndChapter < _selectedChapter) {
+                                if (_selectedEndChapter < _selectedChapter) { 
                                   _selectedEndChapter = _selectedChapter;
                                 }
-                                if (_selectedEndChapter == _selectedChapter) {
-                                  _selectedEndVerse = _selectedVerse;
+                                if (_selectedEndChapter != _selectedChapter) {
+                                   _selectedEndVerse = _verses.isNotEmpty ? _verses.first : 1;
+                                } else { 
+                                   if(_selectedEndVerse < _selectedVerse) _selectedEndVerse = _selectedVerse;
                                 }
                               });
                             }
@@ -875,16 +1140,18 @@ class _BiblePassageSelectorState extends State<BiblePassageSelector> {
                           decoration: const InputDecoration(
                             contentPadding: EdgeInsets.symmetric(horizontal: 12),
                           ),
-                          items: _verses.map((n) => DropdownMenuItem(
+                          items: (_selectedEndChapter == _selectedChapter ? _verses : _chapters.isNotEmpty ? List.generate(_chapters.last, (i) => i + 1) : [1]) 
+                              .map((n) => DropdownMenuItem(
                             value: n,
                             child: Text('$n'),
                           )).toList(),
                           onChanged: (v) {
                             if (v != null) {
+                              if (!mounted) return;
                               setState(() {
                                 _selectedEndVerse = v;
                                 if (_selectedEndChapter == _selectedChapter && 
-                                    _selectedEndVerse < _selectedVerse) {
+                                    _selectedEndVerse < _selectedVerse) { 
                                   _selectedEndVerse = _selectedVerse;
                                 }
                               });
@@ -924,6 +1191,9 @@ class Passage {
   final String testament;
   final String book;
   final int startChap, startVer, endChap, endVer;
+  String? content;
+  TextSpan? titleSpan; 
+  List<TextSpan>? verseSpans; 
 
   Passage({
     required this.testament,
@@ -932,9 +1202,11 @@ class Passage {
     required this.startVer,
     required this.endChap,
     required this.endVer,
+    this.content,
+    this.titleSpan, 
+    this.verseSpans, 
   });
 
-  // 화면에 표시될 구절 텍스트를 생성하는 getter
   String get displayText {
     final start = '$startChap:$startVer';
     final end = '$endChap:$endVer';
@@ -943,35 +1215,62 @@ class Passage {
         : '$book $start ~ $end';
   }
 
-  // 문자열 형태의 구절 정보를 파싱하여 Passage 객체를 생성하는 factory 생성자
   factory Passage.fromString(String s) {
-    final parts = s.split(' ');
-    final testament = parts[0];
-    final book = parts[1];
-    final range = parts.sublist(2).join(' ');
+    debugPrint('Parsing passage string: $s');
+    try {
+      final parts = s.split(' ');
+      if (parts.length < 2) {
+        debugPrint('Invalid passage format: $s (not enough parts, needs at least 2)');
+        throw FormatException('Invalid passage format');
+      }
 
-    if (range.contains('~')) {
-      final ranges = range.split('~').map((e) => e.trim()).toList();
-      final startParts = ranges[0].split(':').map(int.parse).toList();
-      final endParts = ranges[1].split(':').map(int.parse).toList();
-      return Passage(
-        testament: testament,
-        book: book,
-        startChap: startParts[0],
-        startVer: startParts[1],
-        endChap: endParts[0],
-        endVer: endParts[1],
-      );
-    } else {
-      final singleParts = range.split(':').map(int.parse).toList();
-      return Passage(
-        testament: testament,
-        book: book,
-        startChap: singleParts[0],
-        startVer: singleParts[1],
-        endChap: singleParts[0],
-        endVer: singleParts[1],
-      );
+      final book = parts[0]; // 책 이름
+      final rangeString = parts.sublist(1).join(' '); // 장절 정보
+
+      if (rangeString.contains('~')) {
+        // 범위가 있는 경우 처리
+        final ranges = rangeString.split('~').map((e) => e.trim()).toList();
+        if (ranges.length != 2) {
+          debugPrint('Invalid range format: $rangeString');
+          throw FormatException('Invalid range format');
+        }
+
+        final startParts = ranges[0].split(':').map(int.parse).toList(); // 시작 장절
+        final endParts = ranges[1].split(':').map(int.parse).toList();   // 끝 장절
+
+        if (startParts.length != 2 || endParts.length != 2) {
+          debugPrint('Invalid verse format in range: $rangeString');
+          throw FormatException('Invalid verse format');
+        }
+
+        return Passage(
+          testament: book.startsWith('구약') ? '구약' : '신약', // 구약/신약 판단
+          book: book,
+          startChap: startParts[0],
+          startVer: startParts[1],
+          endChap: endParts[0],
+          endVer: endParts[1],
+        );
+      } else {
+        // 범위가 없는 경우 처리 (예: 1:1)
+        final singleParts = rangeString.split(':').map(int.parse).toList();
+        if (singleParts.length != 2) {
+          debugPrint('Invalid verse format: $rangeString');
+          throw FormatException('Invalid verse format');
+        }
+
+        return Passage(
+          testament: book.startsWith('구약') ? '구약' : '신약',
+          book: book,
+          startChap: singleParts[0],
+          startVer: singleParts[1],
+          endChap: singleParts[0], // 시작 장과 끝 장 동일
+          endVer: singleParts[1], // 시작 절과 끝 절 동일
+        );
+      }
+    } catch (e) {
+      debugPrint('Error parsing passage: $s, error: $e');
+      rethrow;
     }
   }
 }

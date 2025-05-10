@@ -101,3 +101,91 @@ ThemeData darkTheme = ThemeData(
     ),
   ),
 );
+
+// 기본 카드 테마
+final CardTheme defaultCardTheme = CardTheme(
+  color: BootstrapColors.white,
+  elevation: 3,
+  margin: const EdgeInsets.all(8),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+    side: BorderSide(color: BootstrapColors.gray, width: 1),
+  ),
+);
+
+// 테두리만 있는 카드 테마
+final CardTheme outlinedCardTheme = CardTheme(
+  color: BootstrapColors.transparent,
+  elevation: 0,
+  margin: const EdgeInsets.all(8),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+    side: BorderSide(color: BootstrapColors.primary, width: 1.5),
+  ),
+);
+
+// 성공 카드 테마
+final CardTheme successCardTheme = CardTheme(
+  color: BootstrapColors.success.withAlpha(25), // 변경된 부분
+  elevation: 2,
+  margin: const EdgeInsets.all(8),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+    side: BorderSide(color: BootstrapColors.success, width: 1.5),
+  ),
+);
+
+// 경고 카드 테마
+final CardTheme warningCardTheme = CardTheme(
+  color: BootstrapColors.warning.withAlpha(25), // 변경된 부분
+  elevation: 2,
+  margin: const EdgeInsets.all(8),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+    side: BorderSide(color: BootstrapColors.warning, width: 1.5),
+  ),
+);
+
+// 위험 카드 테마
+final CardTheme dangerCardTheme = CardTheme(
+  color: BootstrapColors.danger.withAlpha(25), // 변경된 부분
+  elevation: 2,
+  margin: const EdgeInsets.all(8),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+    side: BorderSide(color: BootstrapColors.danger, width: 1.5),
+  ),
+);
+
+// 정보 카드 테마
+final CardTheme infoCardTheme = CardTheme(
+  color: BootstrapColors.info.withAlpha(25), // 변경된 부분
+  elevation: 2,
+  margin: const EdgeInsets.all(8),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+    side: BorderSide(color: BootstrapColors.info, width: 1.5),
+  ),
+);
+
+// 어두운 카드 테마
+final CardTheme darkCardTheme = CardTheme(
+  color: BootstrapColors.dark,
+  elevation: 3,
+  margin: const EdgeInsets.all(8),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+    side: BorderSide(color: BootstrapColors.grayDark, width: 1.5),
+  ),
+);
+
+// 밝은 카드 테마
+final CardTheme lightCardTheme = CardTheme(
+  color: BootstrapColors.light,
+  elevation: 3,
+  margin: const EdgeInsets.all(8),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
+    side: BorderSide(color: BootstrapColors.gray, width: 1.5),
+  ),
+);

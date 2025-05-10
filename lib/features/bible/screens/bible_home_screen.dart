@@ -383,10 +383,10 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
         // 각 절을 감싸는 Card 위젯
         return Card(
           key: _verseKeys[index], // 각 절의 위치를 추적하기 위한 키
-          color: BootstrapColors.secondary, // 카드 배경색
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), // 카드 외부 여백
-          elevation: Theme.of(context).cardTheme.elevation ?? 1, // 그림자 효과
-          shape: Theme.of(context).cardTheme.shape, // 카드 모양
+          margin: darkCardTheme.margin, // darkCardTheme의 여백
+          elevation: darkCardTheme.elevation, // darkCardTheme의 그림자 효과
+          shape: darkCardTheme.shape, // darkCardTheme의 모양
+          color: darkCardTheme.color, // darkCardTheme의 배경색
           child: Padding(
             padding: const EdgeInsets.all(12), // 카드 내부 여백
             child: Column(
@@ -396,7 +396,6 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
                 Text(
                   '${index + 1}절',
                   style: TextStyle(
-                    // decoration: TextDecoration.underline, // 밑줄
                     fontWeight: FontWeight.bold, // 굵게
                     color: BootstrapColors.light, // 텍스트 색상
                     fontSize: _fontSize, // 현재 폰트 크기 적용
@@ -419,8 +418,10 @@ class _BibleHomeScreenState extends State<BibleHomeScreen> {
                           TextSpan(
                             text: '$v ', // 버전 이름 표시
                             style: const TextStyle(
-                              fontWeight: FontWeight.bold, // 굵게
-                              color: BootstrapColors.teal, // 버전 이름 색상
+                              // fontWeight: FontWeight.w200, // 굵게
+                              fontStyle: FontStyle.italic,
+                              fontSize: 10,
+                              color: BootstrapColors.info, // 버전 이름 색상
                             ),
                           ),
                           TextSpan(text: text), // 절 본문 표시
