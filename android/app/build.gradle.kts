@@ -6,11 +6,10 @@ plugins {
 }
 
 android {
-    namespace = "com.example.ourlife"
+    namespace = "com.unclebob.ourlife"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
     ndkVersion = "27.0.12077973"
-
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -22,23 +21,40 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.ourlife"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = "com.unclebob.ourlife"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
-    buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+    // ✅ 서명 설정
+    signingConfigs {
+        create("release") {
+            storeFile = file("c:/Projects/keys/ourlife-release.jks")
+            storePassword = "Vari3112##"
+            keyAlias = "ourlife"
+            keyPassword = "Vari3112##"
         }
     }
+
+    // ✅ 빌드 타입 정의
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+
+            // ✅ Java/Kotlin 코드 난독화 및 리소스 축소 활성화
+            isMinifyEnabled = true
+            isShrinkResources = true
+
+            // ✅ ProGuard 설정 파일 사용
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+
 }
 
 flutter {
