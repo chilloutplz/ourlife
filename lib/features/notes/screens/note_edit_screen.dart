@@ -225,10 +225,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                           ),
                         ),
                         TextSpan(
-                          text: '[$versionName] ',
+                          text: '$versionName ',
                           style: const TextStyle( 
-                            color: Colors.grey,
+                            color: BootstrapColors.info,
                             fontStyle: FontStyle.italic,
+                            fontSize: 10
                           ),
                         ),
                         TextSpan(
@@ -383,10 +384,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                       ),
                     ),
                     TextSpan(
-                      text: '[$versionName] ',
+                      text: '$versionName ',
                       style: const TextStyle( 
-                        color: Colors.grey,
+                        color: BootstrapColors.info,
                         fontStyle: FontStyle.italic,
+                        fontSize: 10
                       ),
                     ),
                     TextSpan(
@@ -474,6 +476,11 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   Widget build(BuildContext context) {
     final isEdit = widget.note != null;
 
+    // 테마에 따라 텍스트 색상 설정
+    final textColor = Theme.of(context).brightness == Brightness.light
+        ? Colors.black // Light 테마에서는 검정색 텍스트
+        : Colors.white; // Dark 테마에서는 흰색 텍스트
+
     return Scaffold(
       appBar: AppBar(title: Text(isEdit ? '노트 수정' : '노트 작성')),
       body: GestureDetector(
@@ -499,7 +506,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildSectionLabel('설교일자'),
+                                _buildSectionLabel('설교일자', textColor),
                                 GestureDetector(
                                   onTap: _pickDate,
                                   child: Container(
@@ -520,7 +527,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 24),
-                                _buildSectionLabel('설교자'),
+                                _buildSectionLabel('설교자', textColor),
                                 TextField(
                                   controller: _pastorController,
                                   focusNode: _pastorFocusNode,
@@ -593,7 +600,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                                   ),
                                   maxLines: null,
                                   keyboardType: TextInputType.multiline,
-                                  style: const TextStyle(fontSize: 16, color: Colors.white),
+                                  style: TextStyle(fontSize: 16, color: textColor),
                                   onChanged: (value) => _updateSaveButtonState(),
                                 ),
                               ],
@@ -815,10 +822,10 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     );
   }
 
-  Widget _buildSectionLabel(String text) {
+  Widget _buildSectionLabel(String text, Color textColor) {
     return Text(
       text,
-      style: const TextStyle(fontSize: 12, color: Colors.white),
+      style: TextStyle(fontSize: 12, color: textColor),
     );
   }
 }

@@ -5,12 +5,14 @@ class HomeIconButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final String routeName;
+  final Color? color;
 
   const HomeIconButton({
     super.key,
     required this.icon,
     required this.label,
     required this.routeName,
+    this.color,
   });
 
   @override
@@ -22,7 +24,7 @@ class HomeIconButton extends StatelessWidget {
             shape: CircleBorder(),
           ),
           child: IconButton(
-            icon: Icon(icon),
+            icon: Icon(icon, color: color),
             onPressed: () => Navigator.pushNamed(context, routeName),
             iconSize: 32,
           ),
@@ -30,7 +32,10 @@ class HomeIconButton extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 14),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontSize: 14,
+            color: color,
+            ),
         ),
       ],
     );
