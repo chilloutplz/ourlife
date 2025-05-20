@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ourlife/constants/constants.dart';
 import 'package:ourlife/widgets/bootstrap_card.dart';
 import 'package:ourlife/theme/bootstrap_theme.dart';
@@ -15,38 +16,56 @@ class TodayVerseCard extends StatefulWidget {
 }
 
 class _TodayVerseCardState extends State<TodayVerseCard> {
-  String text = '';
-  String reference = '';
-  bool isLoading = true;
-  bool isError = false;
+  Map<String, dynamic>? _verse;
+  bool _isLoading = true;
+  String? _error;
+  String? _versionSlug;
 
   @override
   void initState() {
     super.initState();
-    fetchRandomVerse();
+    _loadSelectedVersionAndFetch();
   }
 
-  Future<void> fetchRandomVerse() async {
-    setState(() { isLoading = true; isError = false; });
+  Future<void> _loadSelectedVersionAndFetch() async {
+    final prefs = await SharedPreferences.getInstance();
+    final versions = prefs.getStringList('selected_versions');
+    final versionSlug = (versions != null && versions.isNotEmpty)
+        ? versions.first
+        : '우리말'; // 기본값
+
+    setState(() {
+      _versionSlug = versionSlug;
+    });
+
+    await _fetchTodayVerse(versionSlug);
+  }
+
+  Future<void> _fetchTodayVerse(String versionSlug) async {
+    setState(() { 
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
-      final resp = await http.get(Uri.parse('${ApiConstants.baseUrl}/bible/random/'));
+      final uri = Uri.parse('${ApiConstants.baseUrl}/bible/random/?version=$versionSlug');
+      final resp = await http.get(uri);
       if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body);
+        final data = jsonDecode(utf8.decode(resp.bodyBytes));
         setState(() {
-          text = data['text'];
-          reference = '${data['book']} ${data['chapter']}:${data['number']}';
-          isLoading = false;
+          _verse = data;
+          _isLoading = false;
         });
       } else {
-        throw Exception('status ${resp.statusCode}');
+        setState(() {
+          _error = '말씀을 불러올 수 없습니다. (${resp.statusCode})';
+          _isLoading = false;
+        });
       }
     } catch (e) {
       setState(() {
-        text = '말씀을 불러올 수 없습니다.';
-        reference = '';
-        isLoading = false;
-        isError = true;
+        _error = '에러: $e';
+        _isLoading = false;
       });
     }
   }
@@ -55,12 +74,49 @@ class _TodayVerseCardState extends State<TodayVerseCard> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
+    Widget bodyContent;
+    if (_isLoading) {
+      bodyContent = const Center(child: CircularProgressIndicator());
+    } else if (_error != null) {
+      bodyContent = Text(
+        _error!,
+        style: TextStyle(color: cs.error),
+      );
+    } else if (_verse != null) {
+      bodyContent = Text(
+        _verse!['text'] ?? '',
+        style: TextStyle(
+          color: cs.onSurface,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          height: 1.4,
+        ),
+      );
+    } else {
+      bodyContent = const Text('오늘의 말씀을 찾을 수 없습니다.');
+    }
+
+    final footerContent = _error != null
+        ? TextButton(
+            onPressed: () => _fetchTodayVerse(_versionSlug!),
+            child: const Text('다시 시도'),
+          )
+        : _verse != null
+            ? Text(
+                "- ${_verse!['book']} ${_verse!['chapter']}:${_verse!['number']} (${_verse!['version']})",
+                style: TextStyle(
+                  color: cs.onSurface,
+                  fontSize: 14,
+                ),
+              )
+            : const SizedBox.shrink();
+
     return BootstrapCard(
       type: BootstrapCardType.info,
       twoTone: true,
       outline: true,
       header: SizedBox(
-        height: 20, // 고정된 높이 설정
+        height: 20,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -72,45 +128,20 @@ class _TodayVerseCardState extends State<TodayVerseCard> {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.refresh, size: 20), // 아이콘 크기 조정
-              color: BootstrapColors.light, // 아이콘 색상
+              icon: const Icon(Icons.refresh, size: 20),
+              color: BootstrapColors.light,
               tooltip: '새로고침',
-              onPressed: fetchRandomVerse, // 새로고침 기능
-              constraints: const BoxConstraints(
-                minWidth: 32,
-                minHeight: 32, // 버튼 크기 제한
-              ),
-              padding: EdgeInsets.zero, // 내부 여백 제거
+              // onPressed: () => _fetchTodayVerse(_versionSlug!),
+              onPressed: _loadSelectedVersionAndFetch,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              padding: EdgeInsets.zero,
             ),
           ],
         ),
       ),
       headerAlignment: Alignment.center,
-      // body: 로딩 중이면 스피너, 에러면 에러 메시지, 아니면 본문
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Text(
-              '"$text"',
-              style: TextStyle(
-                color: cs.onSurface,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                height: 1.4,
-              ),
-            ),
-      // footer: 에러 시 재시도 버튼, 정상 시 reference
-      footer: isError
-          ? TextButton(
-              onPressed: fetchRandomVerse,
-              child: const Text('다시 시도'),
-            )
-          : Text(
-              "- $reference",
-              style: TextStyle(
-                color: cs.onSurface.withAlpha(255),
-                fontSize: 14,
-              ),
-            ),
+      body: bodyContent,
+      footer: footerContent,
       footerAlignment: Alignment.centerRight,
     );
   }
